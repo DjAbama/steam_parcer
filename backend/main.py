@@ -3,8 +3,9 @@ import time
 import json
 from my_libs.generators import generator, iterator, counter
 from my_libs.memoization import memoizetion
+from my_libs.queue import enqueue, dequeue
 
-
+queue = {}
 
 def get_games_list(api_key, games_per_request):
     last_id = 0
@@ -41,16 +42,30 @@ def get_game_details(appid, api_key):
         data = req.json()
         game_info = data.get(str(appid), {}).get('data', {})
         if data.get(str(appid), {}).get("success"):
-            price = game_info.get('price_overview', {}).get('final_formatted')
-            if price is None:
-                return "Free"
-            else:
-                return price
-    else: 
+            return {
+                "appid": appid,
+                "name": game_info.get("name"),
+                "regular_price": game_info.get("price_overview", {}).get("initial_formatted"),
+                "current_price": game_info.get("price_overview", {}).get("final_formatted"),
+                "discount": game_info.get("price_overview", {}).get("discount_percent", 0),               
+            }
+
+def find_game_id(name, api_key):
+
+    url = "https://store.steampowered.com/api/storesearch/"
+
+    req = requests.get(url, params={"term": name, "key": api_key, "cc": "ua"})
+
+    if req.status_code == 200:
+        data = req.json()
+        if data.get("items"):
+            return data["items"][0].get("id")
+        else:
+            return None
+    else:
         return None
 
+def create_queue(q, game_id, priority):
+    enqueue(q, game_id, priority)
+    return q
 
-
-
-
-key = str(input("Steam api key:"))
