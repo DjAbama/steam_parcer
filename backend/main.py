@@ -5,7 +5,6 @@ from my_libs.generators import generator, iterator, counter
 from my_libs.memoization import memoizetion
 from my_libs.queue import enqueue, dequeue
 
-queue = {}
 
 def get_games_list(api_key, games_per_request):
     last_id = 0
@@ -65,7 +64,28 @@ def find_game_id(name, api_key):
     else:
         return None
 
-def create_queue(q, game_id, priority):
-    enqueue(q, game_id, priority)
-    return q
 
+def process_user_games(games_list, api_key):
+    queue = {}
+
+    for name in games_list:
+        current_id = find_game_id(name, api_key)
+        if current_id:
+            enqueue(queue, current_id, priority = 10)
+
+    while queue:
+        game_id = dequeue(queue, "highest")
+        if not game_id: 
+            break
+        else: 
+            info = get_game_details(game_id, api_key)
+            if info:
+                yield info
+        
+    
+def scan_discounts(api_key, target_discount):
+    scanned_list =get_games_list(api_key, games_per_request=100)
+    for game in scanned_list:
+        info = get_game_details(str(game['appid']), api_key)
+        if info and info.get("discount", 0) > target_discount:
+            yield info
