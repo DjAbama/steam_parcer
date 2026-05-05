@@ -1,9 +1,12 @@
 import requests
 import time
+import asyncio
+import aiohttp
 import json
 from my_libs.generators import generator, iterator, counter
 from my_libs.memoization import memoizetion
 from my_libs.queue import enqueue, dequeue
+from my_libs.async_arrays import Map_promise, Map_callback
 
 
 def get_games_list(api_key, games_per_request):
@@ -34,58 +37,62 @@ def get_games_list(api_key, games_per_request):
         time.sleep(next(delay))
 
 @memoizetion(eviction='LRU', limit=1000)
-def get_game_details(appid, api_key):
+async def get_game_details(appid, api_key):
     url = "https://store.steampowered.com/api/appdetails"
-    req = requests.get(url, params={"appids": appid, "key": api_key, "cc": "us"})
-    if req.status_code == 200:
-        data = req.json()
-        game_info = data.get(str(appid), {}).get('data', {})
-        if data.get(str(appid), {}).get("success"):
-            return {
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params={"appids": appid, "key": api_key, "cc": "us"}) as req:
+            if req.status == 200:
+                data = await req.json()
+                game_info = data.get(str(appid), {}).get('data', {})
+                if data.get(str(appid), {}).get("success"):
+                    return {
                 "appid": appid,
                 "name": game_info.get("name"),
-                "regular_price": game_info.get("price_overview", {}).get("initial_formatted"),
-                "current_price": game_info.get("price_overview", {}).get("final_formatted"),
+                "regular_price": game_info.get("price_overview", {}).get("initial_formatted", "Free"),
+                "current_price": game_info.get("price_overview", {}).get("final_formatted", "Free"),
                 "discount": game_info.get("price_overview", {}).get("discount_percent", 0),               
             }
 
-def find_game_id(name, api_key):
+async def find_game_id(name, api_key):
 
     url = "https://store.steampowered.com/api/storesearch/"
 
-    req = requests.get(url, params={"term": name, "key": api_key, "cc": "ua"})
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params={"term": name, "key": api_key, "cc": "ua"}) as req:
+            if req.status == 200:
+                data = await req.json()
+                if data.get("items"):
+                    return data["items"][0].get("id")
+                else:
+                    return None
+            else:
+                return None
 
-    if req.status_code == 200:
-        data = req.json()
-        if data.get("items"):
-            return data["items"][0].get("id")
-        else:
-            return None
-    else:
-        return None
 
-
-def process_user_games(games_list, api_key):
+async def process_user_games(games_list, api_key):
     queue = {}
 
-    for name in games_list:
-        current_id = find_game_id(name, api_key)
-        if current_id:
-            enqueue(queue, current_id, priority = 10)
+    id_list = await Map_promise(games_list, lambda name: find_game_id(name, api_key))
+
+    for current_id in id_list:
+        enqueue(queue, current_id, priority = 10)
 
     while queue:
         game_id = dequeue(queue, "highest")
         if not game_id: 
             break
         else: 
-            info = get_game_details(game_id, api_key)
+            info = await get_game_details(game_id, api_key)
             if info:
                 yield info
         
     
-def scan_discounts(api_key, target_discount):
+async def scan_discounts(api_key, target_discount):
+
     scanned_list =get_games_list(api_key, games_per_request=100)
+
     for game in scanned_list:
-        info = get_game_details(str(game['appid']), api_key)
-        if info and info.get("discount", 0) > target_discount:
+        info = await get_game_details(str(game['appid']), api_key)
+
+        if info and info.get("discount", 0) >= target_discount:
             yield info

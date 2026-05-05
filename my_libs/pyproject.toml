@@ -1,13 +1,18 @@
-requires = ["setuptools>=61.0"]
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "my_libs"       
-version = "0.1.0"           
-description = " "
-authors = [
-    {name = "Kurochka Vsevolod"}     
-]
-license = {text = "MIT"}    
+name = "my_libs"
+version = "1.0.0"
+description = ""
 
-dependencies = []
+license = "MIT"
+authors = [
+    {name = "Kurochka Vsevolod"}
+]
+
+[tool.setuptools]
+
+packages = ["my_libs"]
+package-dir = {"my_libs" = "."}

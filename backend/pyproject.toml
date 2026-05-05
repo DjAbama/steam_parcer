@@ -8,6 +8,7 @@ version = "1.0.0"
 description = ""
 
 dependencies = [
-    "requests",
-    "my_libs @ file:./my_libs"
+    "aiohttp",      
+    "requests",     
+    "my_libs @ file:./my_libs" 
 ]
