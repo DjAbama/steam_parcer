@@ -99,8 +99,7 @@ async def scan_discounts(api_key, target_discount):
             yield info
 '''
 
-async def get_games_list(api_key, games_per_request):
-    async with aiohttp.ClientSession() as session:
+async def get_games_list(api_key, games_per_request, session):
         last_id = 0
         delay = generator(1, 3)
         request_counter = counter(1)
@@ -125,8 +124,7 @@ async def get_games_list(api_key, games_per_request):
                 if not last_id:
                     break
 
-async def get_game_info(appid, api_key):
-    async with aiohttp.ClientSession() as session:
+async def get_game_info(appid, api_key, session):
         url = "https://store.steampowered.com/api/appdetails"
         async with session.get(url, params={"appids": appid, "key": api_key, "cc": "us"}) as req:
             if req.status != 200:
@@ -143,35 +141,36 @@ async def get_game_info(appid, api_key):
                     "discount": game_info.get("price_overview", {}).get("discount_percent", 0),    
                 }
 
-async def discount_filter(target_discount, appid, api_key, request_limit):
-    async with aiohttp.ClientSession() as session:
+async def discount_filter(target_discount, appid, api_key, request_limit, session):
         async with request_limit:
 
             await asyncio.sleep(1.5)
             
-            info = await get_game_info(appid, api_key)
+            info = await get_game_info(appid, api_key, session)
             if info.get("discount", 0) >= target_discount:
                 return info
             else:
                 return None
 
-async def create_discounts_list(list_generator, api_key):
-    games_list = await anext(list_generator)
-    request_limit = asyncio.Semaphore(1)    
+async def create_discounts_list(list_generator, api_key, session):
+        games_list = await anext(list_generator)
+        request_limit = asyncio.Semaphore(1)    
 
-    tasks = [
-        discount_filter(50, game.get('appid'), api_key, request_limit)
-        for game in games_list
-         
-    ]
+        tasks = [
+            discount_filter(50, game.get('appid'), api_key, request_limit, session)
+            for game in games_list
+            
+        ]
 
-    results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
 
-    reuslt_without_none = []
-    
-    for item in results:
-        if item is not None:
-            reuslt_without_none.append(item)
+        reuslt_without_none = []
+        
+        for item in results:
+            if item is not None:
+                reuslt_without_none.append(item)
+
+        return reuslt_without_none
 
     
 
