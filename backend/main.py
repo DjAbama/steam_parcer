@@ -99,52 +99,68 @@ async def scan_discounts(api_key, target_discount):
             yield info
 '''
 
-def get_games_list(api_key, games_per_request):
-    last_id = 0
-    delay = generator(1, 3)
-    request_counter = counter(1)
+async def get_games_list(api_key, games_per_request):
+    async with aiohttp.ClientSession() as session:
+        last_id = 0
+        delay = generator(1, 3)
+        request_counter = counter(1)
 
-    while True:
-        time.sleep(next(delay))
-        url = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
-        current_request = next(request_counter)
-        req = requests.get(url, params={"key": api_key, "max_results": games_per_request, "last_appid": last_id})
-        if req.status_code != 200:
-            print("Error:", req.status_code)
-            return None
-        games_list = req.json().get("response", {}).get("apps", [])
-        last_id = req.json().get("response", {}).get("last_appid")
+        while True:
+            await asyncio.sleep(next(delay))
+            url = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
+            current_request = next(request_counter)
+            async with session.get(url, params={"key": api_key, "max_results": games_per_request, "last_appid": last_id}) as req:
+                if req.status != 200:
+                    print("Error:", req.status)
+                    return None
+                reques_data = await req.json()
+                games_list = reques_data.get("response", {}).get("apps", [])
+                last_id = reques_data.get("response", {}).get("last_appid")
 
-        yield games_list
+                if not games_list:
+                    break
 
-def get_game_info(appid, api_key):
-    url = "https://store.steampowered.com/api/appdetails"
-    req = requests.get(url, params={"appids": appid, "key": api_key, "cc": "us"})
-    if req.status_code != 200:
-        print("Error:", req.status_code)
-        return None
-    game_info = req.json().get(str(appid), {}).get("data", {})
-    if req.json().get(str(appid), {}).get("success"):
-        return {
-            "appid": appid,
-            "name": game_info.get("name"),
-            "regular_price": game_info.get("price_overview", {}).get("initial_formatted", "Free"),
-            "current_price": game_info.get("price_overview", {}).get("final_formatted", "Free"),
-            "discount": game_info.get("price_overview", {}).get("discount_percent", 0),    
-        }
+                yield games_list
 
-async def discount_filter(target_discount, appid, api_key):
-    info = await get_game_info(appid, api_key)
-    if info.get("discount", 0) >= target_discount:
-        return info
-    else:
-        return None
+                if not last_id:
+                    break
+
+async def get_game_info(appid, api_key):
+    async with aiohttp.ClientSession() as session:
+        url = "https://store.steampowered.com/api/appdetails"
+        async with session.get(url, params={"appids": appid, "key": api_key, "cc": "us"}) as req:
+            if req.status != 200:
+                print("Error:", req.status)
+                return None
+            data = await req.json()
+            game_info =  data.get(str(appid), {}).get("data", {})
+            if data.get(str(appid), {}).get("success"):
+                return {
+                    "appid": appid,
+                    "name": game_info.get("name"),
+                    "regular_price": game_info.get("price_overview", {}).get("initial_formatted", "Free"),
+                    "current_price": game_info.get("price_overview", {}).get("final_formatted", "Free"),
+                    "discount": game_info.get("price_overview", {}).get("discount_percent", 0),    
+                }
+
+async def discount_filter(target_discount, appid, api_key, request_limit):
+    async with aiohttp.ClientSession() as session:
+        async with request_limit:
+
+            await asyncio.sleep(1.5)
+            
+            info = await get_game_info(appid, api_key)
+            if info.get("discount", 0) >= target_discount:
+                return info
+            else:
+                return None
 
 async def create_discounts_list(list_generator, api_key):
-    games_list = next(list_generator)
+    games_list = await anext(list_generator)
+    request_limit = asyncio.Semaphore(1)    
 
     tasks = [
-        discount_filter(50, game.get('appid'), api_key)
+        discount_filter(50, game.get('appid'), api_key, request_limit)
         for game in games_list
          
     ]
