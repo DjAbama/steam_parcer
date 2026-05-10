@@ -1,5 +1,6 @@
 import time
 
+
 def memoizetion(eviction, limit):
     def decorator(func):
 
@@ -23,15 +24,17 @@ def memoizetion(eviction, limit):
                         timeout = item
             return timeout
 
+        
+        async def wrap(*args):
 
-        def wrap(*args):
+            
+            cache_key = tuple(arg for arg in args if isinstance(arg, (int, str, float)))
 
-
-            if args in cache:
-                cache[args]["uses"] += 1
-                cache[args]["time"] = time.time()
-                return cache[args]["value"]
-
+           
+            if cache_key in cache:
+                cache[cache_key]["uses"] += 1
+                cache[cache_key]["time"] = time.time()
+                return cache[cache_key]["value"]
 
             if len(cache) >= limit:
 
@@ -50,8 +53,10 @@ def memoizetion(eviction, limit):
                 if callable(eviction):
                     cache.pop(eviction(cache))
 
-            result = func(*args)
-            cache[args] = {
+            result = await func(*args)
+            
+            
+            cache[cache_key] = {
                 "value": result,
                 "uses": 0,
                 "time": time.time()
@@ -61,5 +66,3 @@ def memoizetion(eviction, limit):
 
         return wrap
     return decorator
-
-

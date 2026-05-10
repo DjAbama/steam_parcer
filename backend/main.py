@@ -21,7 +21,7 @@ async def get_games_list(api_key, games_per_request, session):
             async with session.get(url, params={"key": api_key, "max_results": games_per_request, "last_appid": last_id}) as req:
                 if req.status != 200:
                     print("Error:", req.status)
-                    return None
+                    return 
                 reques_data = await req.json()
                 games_list = reques_data.get("response", {}).get("apps", [])
                 last_id = reques_data.get("response", {}).get("last_appid")
@@ -34,6 +34,7 @@ async def get_games_list(api_key, games_per_request, session):
                 if not last_id:
                     break
 
+@memoizetion(eviction=3600.0, limit=1000)
 async def get_game_info(appid, api_key, session):
         url = "https://store.steampowered.com/api/appdetails"
         async with session.get(url, params={"appids": appid, "key": api_key, "cc": "us"}) as req:
@@ -57,7 +58,7 @@ async def discount_filter(target_discount, appid, api_key, request_limit, sessio
             await asyncio.sleep(1.5)
             
             info = await get_game_info(appid, api_key, session)
-            if info.get("discount", 0) >= target_discount:
+            if info and info.get("discount", 0) >= target_discount:
                 return info
             else:
                 return None
@@ -82,8 +83,8 @@ async def create_discounts_list(discount, list_generator, api_key, session):
 
         return reuslt_without_none
 
-async def scan_user_games(discount, name_list, api_key, request_limit, session):
-    async def find_id(name, api_key, session):
+@memoizetion(eviction='LRU', limit=1000)
+async def find_id(name, api_key, session):
         url = "https://store.steampowered.com/api/storesearch/"
         async with session.get(url, params={"term": name, "key": api_key, "cc": "ua"}) as req:
             if req.status != 200:
@@ -95,8 +96,8 @@ async def scan_user_games(discount, name_list, api_key, request_limit, session):
                 return game_id[0].get("id")
             else:
                 return None 
-        
-    
+
+async def scan_user_games(discount, name_list, api_key, request_limit, session):
     tasks = [
         find_id(name, api_key, session)
         for name in name_list      
