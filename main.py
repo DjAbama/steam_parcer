@@ -72,6 +72,7 @@ async def process_all_text(message: Message):
     if current_state == "wait_key":
         users_db[user_id]["api_key"] = text
         users_db[user_id]["state"] = None
+        await message.answer("API key saved", reply_markup=nav_panel)
 
     elif current_state == "wait_discount":
         discount = int(text)
@@ -93,7 +94,7 @@ async def process_all_text(message: Message):
         names_list = [n.strip() for n in text.split(",") if n.strip()]
         await message.answer("Loading...")
         
-        results = await scan_user_games(50, names_list, api_key, asyncio.Semaphore(1), global_session)
+        results = await scan_user_games(50, names_list, api_key, asyncio.Semaphore(10), global_session)
         
         if results:
             res_text = "\n".join([f"🎮 {g['name']}: {g['current_price']} (-{g['discount']}%)" for g in results])
@@ -106,7 +107,7 @@ async def process_all_text(message: Message):
     elif current_state == "wait_wishlist":
         await message.answer("Loading...")
         
-        results = await scan_wishlist_games(50, text, api_key, asyncio.Semaphore(1), global_session)
+        results = await scan_wishlist_games(50, text, api_key, asyncio.Semaphore(10), global_session)
         
         if results:
             res_text = "\n".join([f"🎮 {g['name']}: {g['current_price']} (-{g['discount']}%)" for g in results[:15]])
@@ -124,7 +125,7 @@ async def paginate_discounts(call: CallbackQuery):
     data = users_db.get(user_id)
     
     if not data:
-        return await call.message.answer("Session expired. Please search again.")
+        return await call.message.answer("Enter /start")
 
     if call.data == "prev_page":
         data["page"] -= 1
@@ -132,13 +133,13 @@ async def paginate_discounts(call: CallbackQuery):
     elif call.data == "next_page":
         data["page"] += 1
         if data["page"] >= len(data["history"]):
-            await call.message.edit_text("Loading... This takes some time ⏳")
+            await call.message.edit_text("Loading...")
             try:
                 results = await create_discounts_list(data["discount"], data["gen"], data["api_key"], global_session)
                 data["history"].append(results)
             except StopAsyncIteration:
                 data["page"] -= 1
-                return await call.message.answer("No more games in Steam!")
+                return await call.message.answer("No more games in Steam")
 
     results = data["history"][data["page"]]
     await call.message.edit_text(format_results(results, data["page"]), reply_markup=get_pagination_keyboard(data["page"]))

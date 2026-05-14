@@ -3,7 +3,7 @@ import random
 
 def generator(a, b):
     while(True):
-        yield random.randint(a ,b)
+        yield random.randfloat(a ,b)
 
 def counter(start_number):
     while(True):

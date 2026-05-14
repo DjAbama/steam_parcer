@@ -11,11 +11,10 @@ from my_libs.async_arrays import Map_promise, Map_callback
 
 async def get_games_list(api_key, games_per_request, session):
         last_id = 0
-        delay = generator(1, 3)
+        delay = generator(0, 1)
         request_counter = counter(1)
 
         while True:
-            await asyncio.sleep(next(delay))
             url = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
             current_request = next(request_counter)
             async with session.get(url, params={"key": api_key, "max_results": games_per_request, "last_appid": last_id}) as req:
