@@ -6,7 +6,8 @@ import json
 from my_libs.generators import generator, iterator, counter
 from my_libs.memoization import memoizetion
 from my_libs.queue import enqueue, dequeue
-from my_libs.async_arrays import Map_promise, Map_callback
+from my_libs.event_emmiter import subscribe, unsubscribe, event_emmiter
+
 
 
 async def get_games_list(api_key, games_per_request, session):
@@ -58,6 +59,7 @@ async def discount_filter(target_discount, appid, api_key, request_limit, sessio
             
             info = await get_game_info(appid, api_key, session)
             if info and info.get("discount", 0) >= target_discount:
+                await event_emmiter("discount_found", info)
                 return info
             else:
                 return None
