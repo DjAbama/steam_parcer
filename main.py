@@ -5,12 +5,18 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKe
 from aiogram.filters import CommandStart
 
 from backend.main import get_games_list, create_discounts_list, scan_user_games, scan_wishlist_games
+from my_libs.event_emmiter import subscribe, unsubscribe, event_emmiter
 
 bot = Bot(token="8687983204:AAHAvMLw5G3bv4tyqfZH0JsnTfVB0ckhIlA")
 dp = Dispatcher()
 
 global_session = None
 users_db = {} 
+
+async def game_found(game):
+    print(f"Game: {game['name']} Discount {game['discount']}%")
+
+subscribe("discount_found", game_found)
 
 @dp.startup()
 async def on_startup():

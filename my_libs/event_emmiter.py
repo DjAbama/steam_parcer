@@ -11,7 +11,7 @@ def unsubscribe(event, func):
     if func in subs[event]:
         subs[event].remove(func)
 
-async def event_emmiter(event):
+async def event_emmiter(event, data):
     if event in subs:
         for func in subs[event]:
-            await func()
+            await func(data)
